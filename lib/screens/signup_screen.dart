@@ -1,6 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lab3_mis/reusable_widgets/reusable_widget.dart';
-import 'package:lab3_mis/screens/exams_screen.dart';
 import 'package:lab3_mis/screens/signin_screen.dart';
 import 'package:lab3_mis/utils/color_utils.dart';
 import 'package:flutter/material.dart';

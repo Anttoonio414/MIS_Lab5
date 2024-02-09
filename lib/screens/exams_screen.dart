@@ -1,10 +1,186 @@
 import 'package:flutter/material.dart';
 
+import 'calendar_widget.dart';
+
 class Exam {
   final String subjectName;
   final DateTime dateTime;
 
   Exam({required this.subjectName, required this.dateTime});
+}
+
+class ExamsScreen extends StatefulWidget {
+  final Function(Map<DateTime, List<Exam>>) onCalendarUpdate;
+
+  const ExamsScreen({Key? key, this.onCalendarUpdate = _defaultCallback})
+      : super(key: key);
+
+  static void _defaultCallback(Map<DateTime, List<Exam>> updatedEvents) {}
+
+  @override
+  ExamsScreenState createState() => ExamsScreenState();
+}
+
+class ExamsScreenState extends State<ExamsScreen> {
+  List<Exam> exams = [];
+  late Map<DateTime, List<Exam>> _events = {};
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Exams"),
+      ),
+      body: exams.isNotEmpty
+          ? GridView.builder(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+        ),
+        itemCount: exams.length,
+        itemBuilder: (context, index) {
+          return ExamCard(
+            exam: exams[index],
+            onEdit: () {
+              _navigateToEditExamScreen(exams[index]);
+            },
+            onDelete: () {
+              _showDeleteConfirmation(exams[index]);
+            },
+          );
+        },
+      )
+          : const Center(
+        child: Text("No exams available. Add exams using the '+' button."),
+      ),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            heroTag: 'add_exam_button',
+            onPressed: () async {
+              Exam? newExam = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AddEditExamScreen(
+                    onExamAddedOrEdited: (exam) {
+                      _loadEvents();
+                    },
+                  ),
+                ),
+              );
+
+              if (newExam != null) {
+                setState(() {
+                  exams.add(newExam);
+                  _loadEvents(); // Load events after adding a new exam
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Exam added successfully."),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+            child: const Icon(Icons.add),
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton(
+            heroTag: 'open_calendar_button',
+            onPressed: () async {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CalendarScreen(
+                    events: _events, // Pass the initial events
+                    onUpdate: (updatedEvents) {
+                      _updateCalendar(updatedEvents);
+                    },
+                    exams: [],
+                  ),
+                ),
+              );
+
+
+            },
+            child: const Icon(Icons.calendar_today),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _loadEvents() {
+    _events.clear();
+
+    for (var exam in exams) {
+      DateTime examDate = DateTime(
+        exam.dateTime.year,
+        exam.dateTime.month,
+        exam.dateTime.day,
+      );
+
+      if (!_events.containsKey(examDate)) {
+        _events[examDate] = [];
+      }
+
+      _events[examDate]!.add(exam);
+    }
+
+    widget.onCalendarUpdate(_events);
+
+    setState(() {});
+  }
+
+  void _updateCalendar(Map<DateTime, List<Exam>> updatedEvents) {
+    widget.onCalendarUpdate(updatedEvents);
+  }
+
+  void _navigateToEditExamScreen(Exam exam) async {
+    Exam? editedExam = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddEditExamScreen(
+          exam: exam,
+          onExamAddedOrEdited: (editedExam) {
+            int index = exams.indexWhere((element) => element == exam);
+            exams[index] = editedExam;
+            _loadEvents();
+          },
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(Exam exam) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Confirm Deletion"),
+          content: const Text("Are you sure you want to delete this exam?"),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text("No"),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  exams.remove(exam);
+                });
+                Navigator.pop(context);
+                _loadEvents();
+              },
+              child: const Text("Yes"),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class ExamCard extends StatelessWidget {
@@ -48,7 +224,7 @@ class ExamCard extends StatelessWidget {
                 ElevatedButton(
                   onPressed: onDelete,
                   style: ElevatedButton.styleFrom(
-                    primary: Colors.red, // Set the background color
+                    backgroundColor: Colors.red,
                   ),
                   child: const Text("Delete"),
                 ),
@@ -61,24 +237,29 @@ class ExamCard extends StatelessWidget {
   }
 }
 
-
 class AddEditExamScreen extends StatefulWidget {
   final Exam? exam;
+  final Function(Exam) onExamAddedOrEdited;
 
-  const AddEditExamScreen({Key? key, this.exam}) : super(key: key);
+  const AddEditExamScreen({
+    Key? key,
+    this.exam,
+    required this.onExamAddedOrEdited,
+  }) : super(key: key);
 
   @override
-  _AddEditExamScreenState createState() => _AddEditExamScreenState();
+  AddEditExamScreenState createState() => AddEditExamScreenState();
 }
 
-class _AddEditExamScreenState extends State<AddEditExamScreen> {
+class AddEditExamScreenState extends State<AddEditExamScreen> {
   late TextEditingController _subjectController;
   late DateTime _selectedDateTime;
 
   @override
   void initState() {
     super.initState();
-    _subjectController = TextEditingController(text: widget.exam?.subjectName ?? "");
+    _subjectController =
+        TextEditingController(text: widget.exam?.subjectName ?? "");
     _selectedDateTime = widget.exam?.dateTime ?? DateTime.now();
   }
 
@@ -135,9 +316,9 @@ class _AddEditExamScreenState extends State<AddEditExamScreen> {
                   dateTime: _selectedDateTime,
                 );
 
-                // TODO: Implement the logic to save the exam
-                // Add the new exam to the list or save it to your database
-                Navigator.pop(context, newExam); // Close the screen and pass the new exam back
+                widget.onExamAddedOrEdited(newExam);
+
+                Navigator.pop(context, newExam);
               },
               child: const Text("Save"),
             ),
@@ -148,109 +329,16 @@ class _AddEditExamScreenState extends State<AddEditExamScreen> {
   }
 }
 
-class ExamsScreen extends StatefulWidget {
-  const ExamsScreen({Key? key}) : super(key: key);
-
-  @override
-  _ExamsScreenState createState() => _ExamsScreenState();
-}
-
-class _ExamsScreenState extends State<ExamsScreen> {
-  List<Exam> exams = [];
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Exams"),
-      ),
-      body: exams.isNotEmpty
-          ? GridView.builder(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-        ),
-        itemCount: exams.length,
-        itemBuilder: (context, index) {
-          return ExamCard(
-            exam: exams[index],
-            onEdit: () {
-              _navigateToEditExamScreen(exams[index]);
-            },
-            onDelete: () {
-              _showDeleteConfirmation(exams[index]);
-            },
-          );
-        },
-      )
-          : const Center(
-        child: Text("No exams available. Add exams using the '+' button."),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          Exam? newExam = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AddEditExamScreen()),
-          );
-
-          if (newExam != null) {
-            setState(() {
-              exams.add(newExam);
-            });
-          }
-        },
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
-
-  void _navigateToEditExamScreen(Exam exam) async {
-    Exam? editedExam = await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => AddEditExamScreen(exam: exam)),
-    );
-
-    if (editedExam != null) {
-      setState(() {
-        int index = exams.indexWhere((element) => element == exam);
-        exams[index] = editedExam;
-      });
-    }
-  }
-
-  void _showDeleteConfirmation(Exam exam) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text("Confirm Deletion"),
-          content: const Text("Are you sure you want to delete this exam?"),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text("No"),
-            ),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  exams.remove(exam);
-                });
-                Navigator.pop(context);
-              },
-              child: const Text("Yes"),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
 
 void main() {
   runApp(
     MaterialApp(
-      home: ExamsScreen(),
+      routes: {
+        '/': (context) => ExamsScreen(),
+        '/calendar': (context) => CalendarScreen(exams: const [], events: const {}, onUpdate: (updatedEvents) {  },),
+      },
     ),
   );
 }
+
+
