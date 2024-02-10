@@ -43,6 +43,13 @@ dependencies:
   flutter_local_notifications: ^10.0.0
   awesome_notifications: ^0.8.2
 
+  geolocator: ^10.1.0
+  location: ^4.1.1
+  google_maps_flutter: ^2.0.8
+  url_launcher: ^6.2.4
+  permission_handler: ^11.0.1
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.0
 
 dev_dependencies:
   flutter_test:

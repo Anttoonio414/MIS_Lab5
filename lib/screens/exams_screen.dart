@@ -1,12 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'calendar_widget.dart';
+import 'google_map.dart';
 
 class Exam {
   final String subjectName;
   final DateTime dateTime;
+  final double latitude; // Add latitude
+  final double longitude; // Add longitude
 
-  Exam({required this.subjectName, required this.dateTime});
+  Exam({
+    required this.subjectName,
+    required this.dateTime,
+    required this.latitude,
+    required this.longitude,
+  });
+
+  get course => null;
+
+  get timestamp => null;
 }
 
 class ExamsScreen extends StatefulWidget {
@@ -46,6 +59,9 @@ class ExamsScreenState extends State<ExamsScreen> {
             onDelete: () {
               _showDeleteConfirmation(exams[index]);
             },
+            onNavigateToMaps: () {
+              _navigateToMaps(exams[index]);
+            },
           );
         },
       )
@@ -61,11 +77,12 @@ class ExamsScreenState extends State<ExamsScreen> {
               Exam? newExam = await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => AddEditExamScreen(
-                    onExamAddedOrEdited: (exam) {
-                      _loadEvents();
-                    },
-                  ),
+                  builder: (context) =>
+                      AddEditExamScreen(
+                        onExamAddedOrEdited: (exam) {
+                          _loadEvents();
+                        },
+                      ),
                 ),
               );
 
@@ -91,17 +108,16 @@ class ExamsScreenState extends State<ExamsScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => CalendarScreen(
-                    events: _events, // Pass the initial events
-                    onUpdate: (updatedEvents) {
-                      _updateCalendar(updatedEvents);
-                    },
-                    exams: [],
-                  ),
+                  builder: (context) =>
+                      CalendarScreen(
+                        events: _events, // Pass the initial events
+                        onUpdate: (updatedEvents) {
+                          _updateCalendar(updatedEvents);
+                        },
+                        exams: [],
+                      ),
                 ),
               );
-
-
             },
             child: const Icon(Icons.calendar_today),
           ),
@@ -140,14 +156,15 @@ class ExamsScreenState extends State<ExamsScreen> {
     Exam? editedExam = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddEditExamScreen(
-          exam: exam,
-          onExamAddedOrEdited: (editedExam) {
-            int index = exams.indexWhere((element) => element == exam);
-            exams[index] = editedExam;
-            _loadEvents();
-          },
-        ),
+        builder: (context) =>
+            AddEditExamScreen(
+              exam: exam,
+              onExamAddedOrEdited: (editedExam) {
+                int index = exams.indexWhere((element) => element == exam);
+                exams[index] = editedExam;
+                _loadEvents();
+              },
+            ),
       ),
     );
   }
@@ -181,18 +198,39 @@ class ExamsScreenState extends State<ExamsScreen> {
       },
     );
   }
+
+  void _navigateToMaps(Exam exam) async {
+    if (exam.latitude != null && exam.longitude != null) {
+      // Explicitly convert String to Uri
+      final uri = Uri.parse(
+          'https://www.google.com/maps/search/?api=1&query=${exam
+              .latitude},${exam.longitude}');
+
+      // Use the launch function from the url_launcher package
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else {
+        print('Could not launch $uri');
+      }
+    } else {
+      print('Latitude and longitude are not available for this exam.');
+    }
+  }
+
 }
 
 class ExamCard extends StatelessWidget {
   final Exam exam;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onNavigateToMaps; // Add this callback
 
   const ExamCard({
     Key? key,
     required this.exam,
     required this.onEdit,
     required this.onDelete,
+    required this.onNavigateToMaps, // Add this argument
   }) : super(key: key);
 
   @override
@@ -227,6 +265,10 @@ class ExamCard extends StatelessWidget {
                     backgroundColor: Colors.red,
                   ),
                   child: const Text("Delete"),
+                ),
+                ElevatedButton(
+                  onPressed: onNavigateToMaps, // Add this callback to the button
+                  child: const Text("Navigate to Maps"),
                 ),
               ],
             ),
@@ -314,6 +356,8 @@ class AddEditExamScreenState extends State<AddEditExamScreen> {
                 Exam newExam = Exam(
                   subjectName: _subjectController.text,
                   dateTime: _selectedDateTime,
+                  latitude: 37.7749,
+                  longitude: -122.4194,
                 );
 
                 widget.onExamAddedOrEdited(newExam);
